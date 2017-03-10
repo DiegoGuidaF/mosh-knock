@@ -30,6 +30,8 @@ done
 #Last argument should be the server ip
 [ -z $1 ] && exit 1
 SERVER=$1
+
+#Commented out since my server doesn't reply to ping.
 #ping -q -c5 $SERVER > /dev/null
 #if [ $? -ne 0 ]; then
 #    echo "Server not responding"
@@ -44,7 +46,7 @@ SERVER=$1
 gpg2 -d ${KNOCK_FILE:=knock_ports.gpg} | xargs -L3 knock $SERVER
 
 #When -o specified, only knock and exit.
-[ $ONLY_KNOCK -eq 1 ] && exit 0
+[ $ONLY_KNOCK:=0 -eq 1 ] && exit 0
 
 #Connect to the now open ssh/mosh
-mosh --ssh="ssh -p "${SSH_PORT} $Server
+mosh --ssh="ssh -p "${SSH_PORT:=22} $SERVER
