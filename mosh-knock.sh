@@ -20,7 +20,6 @@ display_help() {
     echo "     -p --port         Specify the SSH port"
     echo "     -k --knock        Knock using the predetermined file ./knock_ports.gpg"
     echo "     -kf [file]        Knock using the [file] ports."
-    echo "     -o --only-knock   Only knock without connecting to the server"
     echo "     -h --help         Display this help and exit."
     exit 1
 }
