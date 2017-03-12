@@ -5,14 +5,15 @@
 ##########
 #DEFAULTS#
 ##########
-KNOCK_FILE=knock_ports.gpg
+KNOCK_FILE="./knock_ports.gpg"
 SSH_PORT=22
-
+SSH_FORW_FILE="./ssh_forwards"
 
 #######################
 #The command line help#
 #######################
 display_help() {
+    
     echo "Usage: $0 [option...] SERVER" >&2
     echo
     echo "     -c --connect      Connect to mosh server"
@@ -23,21 +24,47 @@ display_help() {
     echo "     -h --help         Display this help and exit."
     exit 1
 }
+
 ###################################################################
-#Unencrypt the file containing the ports to knock and knock them.##
-#Avoided the use of an intermediate file for security reasons######
+#Unencrypt the file containing the ports to knock and knock them. #
+#Avoided the use of an intermediate file for security reasons.    #
 #Knock -d [delay] added to fix server-router filtering the packets#
 ###################################################################
 knock() {
-    echo "##################"
-    echo "Knocking'em ports"
-    echo "##################"
-    echo
+    
+    echo "Knocking'em ports..."
     
     gpg2 -d $KNOCK_FILE 2> /dev/null | xargs -L3 knock -d 20 $SERVER
     sleep 0.1 #Sleep in order to wait for port to be trully opened
-}
 
+    echo "Knocked."
+}
+check_port(){
+    timeout 1 bash -c "</dev/tcp/${SERVER}/${SSH_PORT}"
+    if [ ! $? -eq 0 ]; then
+	echo "Port is closed"
+	read -p "Want me to knock it open?" yn
+	case $yn in
+	    [Yy]* ) knock;;
+	    [Nn]* ) exit 2;;
+	esac
+    fi	
+}
+###############################
+#Forward the ports through SSH#
+###############################
+port_forw(){
+    #If SSH_FORW is set to 1 (-f), forward the specified port only.
+    #sleep 30 opens port forward for 30s and closes it if no connection is active.
+    if [ $SSH_FORW -eq 1 ]; then
+	echo "Forwarding port $PORT_LOCAL --> ${PORT_SERVER}"
+	ssh -f -o ExitOnForwardFailure=yes -L ${PORT_LOCAL}:${SERVER}:${PORT_SERVER} sleep 30
+
+    else
+	echo "Forwarding ports specified at ${SSH_FORW_FILE}"
+        ssh -f -o ExitOnForwardFailure=yes -F $SSH_FORW_FILE $SERVER sleep 30
+    fi
+}
 
 #Arguments:
 while :
@@ -66,6 +93,21 @@ case $key in
 	SSH=1
 	shift #Shift to next argument
 	;;
+    -f| --forward)
+	SSH_FORW=1
+	FWPORT_LOCAL=$2
+	FWPORT_SERVER=$3
+	shift 3 #Shift to next argumentx3
+	;;
+    -fd| --forward-default)
+	SSH_FORW=2
+	shift #Shift to next argument
+	;;
+    -ff| --forward-file)
+	SSH_FORW=2
+	SSH_FORW_FILE="$2"
+	shift 2 #Shift to next argumentx2
+	;;
     -h|--help)
 	display_help
 	exit 0
@@ -84,15 +126,19 @@ done
 [ -z $1 ] && display_help && exit 1
 SERVER=$1
 
-#Commented out since my server doesn't reply to ping.
-#ping -q -c5 $SERVER > /dev/null
-#if [ $? -ne 0 ]; then
-#    echo "Server not responding"
-#    exit 1
-#fi		 
+#Check if server is available
+ping -q -c1 $SERVER > /dev/null
+if [ $? -ne 0 ]; then
+    echo "Server not responding"
+    exit 1
+fi		 
 
 #Knock the ports
 [ ! -z $KNOCK ] && knock
+
+check_port #First check that port is open.
+
+[ ! -z $SSH_FORW ] && port_forw
 
 #Connect to the now open ssh/mosh
 if [ ! -z $CONNECT ]; then
@@ -100,33 +146,12 @@ if [ ! -z $CONNECT ]; then
     echo "Moshing to server"
     echo "#################"
     echo
-
     mosh --ssh="ssh -p $SSH_PORT" $SERVER && exit 0
-    if [ $? -eq 10 ]; then
-	echo "Are you sure ports have been knocked?"
-	read -p "Want me to knock'em?" yn
-	case $yn in
-	    [Yy]* ) knock ;;
-	    [Nn]* ) exit 2;;
-	esac
-        mosh --ssh="ssh -p $SSH_PORT" $SERVER && exit 0
-    fi
-
     
 elif [ ! -z $SSH ]; then
     echo "################"
     echo "Sshing to server"
     echo "################"
     echo
-    ssh -p ${SSH_PORT:=22} $SERVER && exit 0
-    if [ $? -eq 255 ]; then
-	echo "Are you sure ports have been knocked?"
-	read -p "Want me to knock'em?" yn
-	case $yn in
-	    [Yy]* ) knock;;
-	    [Nn]* ) exit 2;;
-	esac        
-    fi
-    ssh -p ${SSH_PORT:=22} $SERVER && exit 0
+    ssh -p ${SSH_PORT} $SERVER && exit 0
 fi
-
