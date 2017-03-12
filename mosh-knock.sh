@@ -35,12 +35,12 @@ knock() {
     echo "Knocking'em ports..."
     
     gpg2 -d $KNOCK_FILE 2> /dev/null | xargs -L3 knock -d 20 $SERVER
-    sleep 0.1 #Sleep in order to wait for port to be trully opened
+    sleep 0.5 #Sleep in order to wait for port to be trully opened
 
     echo "Knocked."
 }
 check_port(){
-    timeout 1 bash -c "</dev/tcp/${SERVER}/${SSH_PORT}"
+    timeout 1 bash -c "</dev/tcp/${SERVER}/${SSH_PORT}" &> /dev/null
     if [ ! $? -eq 0 ]; then
 	echo "Port is closed"
 	read -p "Want me to knock it open?" yn
@@ -58,11 +58,11 @@ port_forw(){
     #sleep 30 opens port forward for 30s and closes it if no connection is active.
     if [ $SSH_FORW -eq 1 ]; then
 	echo "Forwarding port $PORT_LOCAL --> ${PORT_SERVER}"
-	ssh -f -o ExitOnForwardFailure=yes -L ${PORT_LOCAL}:${SERVER}:${PORT_SERVER} sleep 30
+	ssh -f -o ExitOnForwardFailure=yes -L ${PORT_LOCAL}:${SERVER}:${PORT_SERVER} sleep 30 &> /dev/null
 
     else
 	echo "Forwarding ports specified at ${SSH_FORW_FILE}"
-        ssh -f -o ExitOnForwardFailure=yes -F $SSH_FORW_FILE $SERVER sleep 30
+        ssh -f -o ExitOnForwardFailure=yes -F $SSH_FORW_FILE $SERVER sleep 30 &> /dev/null
     fi
 }
 
